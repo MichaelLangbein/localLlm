@@ -1,1 +1,7 @@
-Renewable energy sources are becoming increasingly important as the world transitions away from fossil fuels. Solar power harnesses energy from the sun using photovoltaic panels, providing clean electricity with minimal environmental impact. Wind turbines convert kinetic energy from wind into electrical power, with offshore installations becoming more common. Hydroelectric dams generate power from flowing water, though they can have ecological consequences. Geothermal energy taps into heat from the Earth's core, offering consistent baseload power. The shift to renewables is driven by climate change concerns and technological advancements making these sources more cost-effective.
+Renewable energy sources are becoming increasingly important as the world transitions away from fossil fuels.
+Solar power harnesses energy from the sun using photovoltaic panels, providing clean electricity with minimal
+environmental impact. Wind turbines convert kinetic energy from wind into electrical power, with offshore
+installations becoming more common. Hydroelectric dams generate power from flowing water, though they can
+have ecological consequences. Geothermal energy taps into heat from the Earth's core, offering consistent
+baseload power. The shift to renewables is driven by climate change concerns and technological advancements
+making these sources more cost-effective.
