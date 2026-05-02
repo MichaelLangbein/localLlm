@@ -57,7 +57,7 @@ def query_endpoint(data: dict):
 
     messages = [{
         "role": "system",
-        "content": f"Tools available: {json.dumps(mcp_calls_available)}. If you want to call an MCP tool, answer with [TOOL_CALL]{{\"tool\": \"<toolName>\", \"args\": <toolArgs>}}[/TOOL_CALL]. Output only valid JSON between the TOOL_CALL markers."
+        "content": f"You are the 'assistant', helping the 'user'. Tools available: {json.dumps(mcp_calls_available)}. If you want to call an MCP tool, answer with [TOOL_CALL]{{\"tool\": \"<toolName>\", \"args\": <toolArgs>}}[/TOOL_CALL]. Output only valid JSON between the TOOL_CALL markers."
     }, {
         "role": "user",
         "content": query
@@ -69,19 +69,23 @@ def query_endpoint(data: dict):
     while loop_ongoing and nr_requests < 4:
         print("Host calling llm ...")
         answer = call_llm(messages)
-        messages.append({"role": "assistant", "content": answer})
-        print("... llm call yielded answer:", answer)
+        print("... llm call yielded answer:", repr(answer))
 
         if match := mcp_regex.search(answer):
+            tool_call_text = match.group(0)
             tool_call = json.loads(match.group(1))
             tool = tool_call["tool"]
             args = tool_call["args"]
 
             print("Host calling MCP tool:", tool, "with args:", args)
             mcp_results = call_mcp_execute(tool, args)
+
+            messages.append({"role": "assistant", "content": tool_call_text})
+            # Add the tool results as a *user* message with readable text (would usually be `role: tool`, but llama3 doesn't know about that role)
+            tool_result_text = f"Tool '{tool}' executed with args {json.dumps(args)}. Results: {json.dumps(mcp_results, indent=2)}"
             messages.append({
-                "role": "tool",
-                "content": json.dumps(mcp_results)
+                "role": "user",
+                "content": tool_result_text
             })
 
             nr_requests += 1
@@ -90,8 +94,8 @@ def query_endpoint(data: dict):
                     "role": "system",
                     "content": "The assistant may no longer call MCP. Answer directly to the user in text now."
                 })
-
         else:
+            # No tool call, this is the final answer
             loop_ongoing = False
 
     print("Host final answer:", answer)
