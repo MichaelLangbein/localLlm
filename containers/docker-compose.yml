@@ -18,7 +18,7 @@ services:
   host:
     build: ./host
     ports:
-      - '5000:5000'
+      - '5003:5000'
     depends_on:
       - llm
       - mcpserver

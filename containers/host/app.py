@@ -24,8 +24,16 @@ def call_llm(messages):
         "messages": messages,
         "stream": False
     }
-    response = requests.post(f"{LLM_URL}/api/chat", json=payload)
-    return response.json()["message"]["content"]
+    try:
+        response = requests.post(
+            f"{LLM_URL}/api/chat", json=payload, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+        return data.get("message", {}).get("content", "No content in response")
+    except requests.RequestException as e:
+        return f"Error calling LLM: {str(e)}"
+    except json.JSONDecodeError:
+        return "Error: Invalid JSON response from LLM"
 
 
 def call_mcp_execute(tool, args):

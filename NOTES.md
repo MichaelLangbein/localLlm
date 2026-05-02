@@ -5,6 +5,11 @@
 - `./upload_file.sh <file_path>`: Upload a file to the fileBucket
 - `./query_host.sh "your query"`: Send a query to the host
 
+## URLs
+
+- File upload: http://localhost:5002/upload
+- Host query: http://localhost:5003/query (POST with {"query": "your question"})
+
 ## Dummy Data
 
 Dummy text files are in `data/`:
