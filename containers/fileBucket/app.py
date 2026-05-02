@@ -7,8 +7,8 @@ from typing import Dict
 
 app = FastAPI()
 
-LLM_URL = "http://llm:11434"
-VECTOR_DB_URL = "http://vectorDb:8000"
+LLM_URL = os.environ.get('LLM_URL', 'http://llm:11434')
+VECTOR_DB_URL = os.environ.get('VECTOR_DB_URL', 'http://vectordb:8000')
 
 FILES_DIR = "/app/files"
 CHUNKS_FILE = "/app/chunks.json"
@@ -23,7 +23,7 @@ if os.path.exists(CHUNKS_FILE):
 else:
     chunks = {}
 
-client = chromadb.HttpClient(host="vectorDb", port=8000)
+client = chromadb.HttpClient(host="vectordb", port=8000)
 collection = client.get_or_create_collection(name="chunks")
 
 

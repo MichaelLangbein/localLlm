@@ -2,12 +2,13 @@ from fastapi import FastAPI
 import requests
 import json
 import re
+import os
 
 app = FastAPI()
 
-LLM_URL = "http://llm:11434"
-MCP_URL = "http://mcpServer:5001"
-VECTOR_DB_URL = "http://vectorDb:8000"
+LLM_URL = os.environ.get('LLM_URL', 'http://llm:11434')
+MCP_URL = os.environ.get('MCP_URL', 'http://mcpserver:5001')
+VECTOR_DB_URL = os.environ.get('VECTOR_DB_URL', 'http://vectordb:8000')
 
 mcp_regex = re.compile(r'\[TOOL_CALL\](.*)\[/TOOL_CALL\]')
 

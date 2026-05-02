@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  vectorDb:
+  vectordb:
     image: chromadb/chroma:latest
     ports:
       - '8000:8000'
@@ -21,37 +21,37 @@ services:
       - '5000:5000'
     depends_on:
       - llm
-      - mcpServer
-      - vectorDb
+      - mcpserver
+      - vectordb
     environment:
       - LLM_URL=http://llm:11434
-      - MCP_URL=http://mcpServer:5001
-      - VECTOR_DB_URL=http://vectorDb:8000
+      - MCP_URL=http://mcpserver:5001
+      - VECTOR_DB_URL=http://vectordb:8000
 
-  mcpServer:
-    build: ./mcpServer
+  mcpserver:
+    build: ./mcpserver
     ports:
       - '5001:5001'
     depends_on:
-      - vectorDb
-      - fileBucket
+      - vectordb
+      - filebucket
       - llm
     environment:
-      - VECTOR_DB_URL=http://vectorDb:8000
+      - VECTOR_DB_URL=http://vectordb:8000
       - LLM_URL=http://llm:11434
 
-  fileBucket:
-    build: ./fileBucket
+  filebucket:
+    build: ./filebucket
     ports:
       - '5002:5002'
     depends_on:
       - llm
-      - vectorDb
+      - vectordb
     volumes:
       - file_data:/app/files
     environment:
       - LLM_URL=http://llm:11434
-      - VECTOR_DB_URL=http://vectorDb:8000
+      - VECTOR_DB_URL=http://vectordb:8000
 
 volumes:
   chroma_data:
