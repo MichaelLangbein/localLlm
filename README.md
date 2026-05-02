@@ -27,10 +27,10 @@ MCP will be simulated by exposing to the AI a fake email-server where it is bein
 - host
   - interface between human and other buckets
 - llm <-- `llmService`
-  - based on ollama, using local 8-bit model
+  - based on ollama llama3 8-bit model
 - mcp server <-- `mcpService`
   - exposes fake email server
-- bucket for uploading text files
+- bucket for uploading text files <-- `bucketService`
   - ingestion script
 - vector db <-- `vectorDbService`
 
@@ -42,8 +42,40 @@ def onFileUpload(file):
 
     fileContents = read(file)
     fileUrl = saveFileLocally(file)
-    embedding = llmService.embed(fileContents)
-    vectorDbService.upload(embedding, fileUrl)
+
+    for chunkNr, chunk in splitContents(fileContents, words=1_000):
+        embedding = llmService.embed(fileContents)
+        vectorDbService.upload(embedding, fileUrl, chunkNr)
+
+```
+
+## MCP server pseudocode
+
+```python
+def getCapabilities():
+    return [{
+        "name": "readFiles",
+        "description": "Allows loading text chunks by keywords from a bucket of text files",
+        "inputSchema": {...}
+    }, {
+        "name": "sendMail",
+        "description": "Allows sending emails",
+        "inputSchema": {...}
+    }]
+
+
+def execute(tool, *args):
+
+    if tool == "readFiles":
+        fileUrls, chunkNrs = vectorDbService.similarity_search(*args)
+        fileContents = bucketService.loadFiles(fileUrls, chunkNrs)
+        return fileContents
+
+    elif tool == "sendMail":
+        return f"Mail sent: {args}"
+
+    else:
+        pass
 
 ```
 
@@ -53,39 +85,30 @@ def onFileUpload(file):
 
 def host(query):
 
-    keywords = llmService.query(f"""
-        Please list the most important keywords in this user query. Answer in JSON.
-        Query:
-        {query}
-    """)
+    messages = [
+        {"role": "system", "content": f"Tools available: {mcpCallsAvailable}. If you want to call an MCP tool, answer with [CALL:<toolname>(<toolArg>*)]"},
+        {"role": "user", "content": query}
+    ]
 
-    backgroundInformation = vectorDbService.query(keywords)
-
+    # should return:
+    # -- MCP to read from vectorDb
+    # -- MCP to write emails
     mcpCallsAvailable = mcpService.getCapabilities()
 
-    answer = llmService.query(f"""
-        Here is a user query:
-        {query}
-        Try to answer it given the following background information:
-        {backgroundInformation}
-        You can also call any of these MCP tools if you need to.
-        {mcpCallsAvailable}
-    """)
+    loopOngoing = True
 
-    while mcpRegex.matches(answer):
+    while loopOngoing:
 
-        results = mcpService.execute(answer)
+        answer = llmService.query(messages)
 
-        backgroundInformation += results
+        if mcpRegex.match(answer):
 
-        answer = llmService.query(f"""
-            Here is a user query:
-            {query}
-            Try to answer it given the following background information:
-            {backgroundInformation}
-            You can also call any of these MCP tools if you need to.
-            {mcpCallsAvailable}
-        """)
+            mcpResults = mcpService.execute(answer)
+            messages.append({"role": "assistant", "content": answer})
+            messages.append({"role": "tool", "content": mcpResults})
+
+        else:
+            loopOngoing = False
 
     return answer
 
