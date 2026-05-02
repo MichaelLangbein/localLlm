@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  vectorDb:
+    image: chromadb/chroma:latest
+    ports:
+      - '8000:8000'
+    volumes:
+      - chroma_data:/chroma/chroma
+
+  llm:
+    build: ./llm
+    ports:
+      - '11434:11434'
+    volumes:
+      - ollama_data:/root/.ollama
+
+  host:
+    build: ./host
+    ports:
+      - '5000:5000'
+    depends_on:
+      - llm
+      - mcpServer
+      - vectorDb
+    environment:
+      - LLM_URL=http://llm:11434
+      - MCP_URL=http://mcpServer:5001
+      - VECTOR_DB_URL=http://vectorDb:8000
+
+  mcpServer:
+    build: ./mcpServer
+    ports:
+      - '5001:5001'
+    depends_on:
+      - vectorDb
+      - fileBucket
+      - llm
+    environment:
+      - VECTOR_DB_URL=http://vectorDb:8000
+      - LLM_URL=http://llm:11434
+
+  fileBucket:
+    build: ./fileBucket
+    ports:
+      - '5002:5002'
+    depends_on:
+      - llm
+      - vectorDb
+    volumes:
+      - file_data:/app/files
+    environment:
+      - LLM_URL=http://llm:11434
+      - VECTOR_DB_URL=http://vectorDb:8000
+
+volumes:
+  chroma_data:
+  ollama_data:
+  file_data:
