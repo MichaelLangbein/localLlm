@@ -26,7 +26,7 @@ def call_llm(messages):
     }
     try:
         response = requests.post(
-            f"{LLM_URL}/api/chat", json=payload, timeout=30)
+            f"{LLM_URL}/api/chat", json=payload)  # , timeout=30)
         response.raise_for_status()
         data = response.json()
         return data.get("message", {}).get("content", "No content in response")
@@ -47,6 +47,7 @@ def call_mcp_execute(tool, args):
 
 @app.post("/query")
 def query_endpoint(data: dict):
+    print("Host received query:", data)
     query = data["query"]
 
     mcp_calls_available = get_mcp_capabilities()
@@ -61,6 +62,7 @@ def query_endpoint(data: dict):
     nr_requests = 0
 
     while loop_ongoing and nr_requests < 4:
+        print("Host calling llm ...")
         answer = call_llm(messages)
 
         if match := mcp_regex.search(answer):
@@ -68,6 +70,7 @@ def query_endpoint(data: dict):
             tool = tool_call["tool"]
             args = tool_call["args"]
 
+            print("Host calling MCP tool:", tool, "with args:", args)
             mcp_results = call_mcp_execute(tool, args)
             messages.append({"role": "assistant", "content": answer})
             messages.append(
@@ -82,4 +85,5 @@ def query_endpoint(data: dict):
             {"role": "system", "content": "The assistant may no longer call MCP. Answer directly to the user in text now."})
         answer = call_llm(messages)
 
+    print("Host final answer:", answer)
     return {"answer": answer}
