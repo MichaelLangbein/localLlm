@@ -24,6 +24,7 @@ def embed_text(text):
 
 @app.get("/capabilities")
 def get_capabilities():
+    print("MCP received request for capabilities")
     return [
         {
             "name": "findChunks",
@@ -57,24 +58,40 @@ def get_capabilities():
 
 @app.post("/execute")
 def execute_tool(data: dict):
+    print("MCP received request to execute tool:", data)
+
     tool = data["tool"]
     args = data["args"]
 
     if tool == "findChunks":
-        search_query = args["search_query"]
-        query_embedding = embed_text(search_query)
-        results = collection.query(
-            query_embeddings=[query_embedding],
-            n_results=5
-        )
-        output = []
-        for i in range(len(results["documents"])):
-            file_url = results["metadatas"][i]["fileUrl"]
-            chunk_content = results["documents"][i]
-            output.append({"file": file_url, "chunkContent": chunk_content})
-        return output
+        try:
+            search_query = args["search_query"]
+            query_embedding = embed_text(search_query)
+            results = collection.query(
+                query_embeddings=[query_embedding],
+                n_results=5
+            )
+            output = []
+
+            # ChromaDB returns results as lists of lists (one per list per embedding ... so we only need one)
+            documents = results.get("documents", [[]])[0]
+            metadatas = results.get("metadatas", [[]])[0]
+
+            if not documents:
+                return output
+
+            for chunk_content, metadata in zip(documents, metadatas):
+                if metadata and "fileUrl" in metadata:
+                    output.append(
+                        {"file": metadata["fileUrl"], "chunkContent": chunk_content})
+
+            return output
+        except Exception as e:
+            return {"error": f"Failed to find chunks: {str(e)}"}
 
     elif tool == "sendMail":
+        print(
+            f"Simulating sending email to: {args['to']}, subject: {args['subject']}, body: {args['body']}")
         return f"Mail sent: {args}"
 
     else:

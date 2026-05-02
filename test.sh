@@ -26,11 +26,12 @@
 
 # curl http://localhost:5001/capabilities
 
-curl -X POST http://localhost:5001/execute -H "Content-Type: application/json" -d '{
-  "tool": "findChunks",
-  "args": {
-    "search_query": "latest news on renewable energy"
-  }
-}'
+# curl -X POST http://localhost:5001/execute -H "Content-Type: application/json" -d '{
+#   "tool": "findChunks",
+#   "args": {
+#     "search_query": "latest news on renewable energy"
+#   }
+# }'
 
 
+./query_host.sh "what concepts are common in most files in our file container?"

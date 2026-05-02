@@ -47,6 +47,8 @@ def split_into_chunks(text, words_per_chunk=1000):
 
 @app.post("/upload")
 def upload_file(file: UploadFile = File(...)):
+    print(f"Received file: {file.filename}")
+
     file_path = os.path.join(FILES_DIR, file.filename)
     with open(file_path, 'wb') as f:
         f.write(file.file.read())
@@ -58,6 +60,8 @@ def upload_file(file: UploadFile = File(...)):
 
     chunk_list = split_into_chunks(file_contents)
 
+    print(
+        f"File split into {len(chunk_list)} chunks. Processing and saving to vector DB...")
     for chunk_nr, chunk in enumerate(chunk_list):
         embedding = embed_text(chunk)
         collection.add(
@@ -69,6 +73,7 @@ def upload_file(file: UploadFile = File(...)):
         chunks[f"{file_url}_{chunk_nr}"] = chunk
 
     # Save chunks
+    print(f"Saving {len(chunks)} chunks to {CHUNKS_FILE}")
     with open(CHUNKS_FILE, 'w') as f:
         json.dump(chunks, f)
 
@@ -77,6 +82,7 @@ def upload_file(file: UploadFile = File(...)):
 
 @app.get("/get_chunk")
 def get_chunk(fileUrl: str, chunkNr: int):
+    print(f"Received request for chunk: {fileUrl}_{chunkNr}")
     key = f"{fileUrl}_{chunkNr}"
     if key in chunks:
         return {"chunk": chunks[key]}

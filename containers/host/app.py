@@ -19,14 +19,17 @@ def get_mcp_capabilities():
 
 
 def call_llm(messages):
+    print("Host sending messages to LLM:", messages)
+
     payload = {
         "model": "llama3",
         "messages": messages,
         "stream": False
     }
+
     try:
         response = requests.post(
-            f"{LLM_URL}/api/chat", json=payload)  # , timeout=30)
+            f"{LLM_URL}/api/chat", json=payload)
         response.raise_for_status()
         data = response.json()
         return data.get("message", {}).get("content", "No content in response")
@@ -52,11 +55,13 @@ def query_endpoint(data: dict):
 
     mcp_calls_available = get_mcp_capabilities()
 
-    messages = [
-        {"role": "system",
-            "content": f"Tools available: {json.dumps(mcp_calls_available)}. If you want to call an MCP tool, answer with [TOOL_CALL]{{\"tool\": \"<toolName>\", \"args\": <toolArgs>}}[/TOOL_CALL]. Output only valid JSON between the TOOL_CALL markers."},
-        {"role": "user", "content": query}
-    ]
+    messages = [{
+        "role": "system",
+        "content": f"Tools available: {json.dumps(mcp_calls_available)}. If you want to call an MCP tool, answer with [TOOL_CALL]{{\"tool\": \"<toolName>\", \"args\": <toolArgs>}}[/TOOL_CALL]. Output only valid JSON between the TOOL_CALL markers."
+    }, {
+        "role": "user",
+        "content": query
+    }]
 
     loop_ongoing = True
     nr_requests = 0
@@ -64,6 +69,8 @@ def query_endpoint(data: dict):
     while loop_ongoing and nr_requests < 4:
         print("Host calling llm ...")
         answer = call_llm(messages)
+        messages.append({"role": "assistant", "content": answer})
+        print("... llm call yielded answer:", answer)
 
         if match := mcp_regex.search(answer):
             tool_call = json.loads(match.group(1))
@@ -72,18 +79,20 @@ def query_endpoint(data: dict):
 
             print("Host calling MCP tool:", tool, "with args:", args)
             mcp_results = call_mcp_execute(tool, args)
-            messages.append({"role": "assistant", "content": answer})
-            messages.append(
-                {"role": "tool", "content": json.dumps(mcp_results)})
+            messages.append({
+                "role": "tool",
+                "content": json.dumps(mcp_results)
+            })
 
             nr_requests += 1
+            if nr_requests >= 4:
+                messages.append({
+                    "role": "system",
+                    "content": "The assistant may no longer call MCP. Answer directly to the user in text now."
+                })
+
         else:
             loop_ongoing = False
-
-    if nr_requests >= 4:
-        messages.append(
-            {"role": "system", "content": "The assistant may no longer call MCP. Answer directly to the user in text now."})
-        answer = call_llm(messages)
 
     print("Host final answer:", answer)
     return {"answer": answer}
