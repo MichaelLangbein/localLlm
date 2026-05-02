@@ -8,19 +8,16 @@ This is to learn about concepts, not about optimizing.
 
 - locally hosted LLMs
 
-- RAG:
-  - Request comes in at host. Host first asks llm to list keywords from the query.
-  - llm lists important keywords from query
-  - host loads relevant information pertaining those keywords from bucket container into query context
-  - llm answers with the background knowledge of the newly loaded context information
-
 - MCP:
   - llm is allowed to answer with MCP calls instead of text
   - For this, the host first lists all allowed MCP functions and their arguments to the model
   - It tells the llm that it is allowed to call those MCP functions instead of answering in text
 
-RAG will be implemented by adding content from a bucket full of textfiles.
-MCP will be simulated by exposing to the AI a fake email-server where it is being made to believe that it can send email.
+- RAG:
+  - Request comes in at host.
+  - LLM decides to look for more information via MCP.
+  - Loaded information is added to query context
+  - llm answers with the background knowledge of the newly loaded context information
 
 ## Architecture (all docker containers)
 
@@ -30,9 +27,12 @@ MCP will be simulated by exposing to the AI a fake email-server where it is bein
   - based on ollama llama3 8-bit model
 - mcp server <-- `mcpService`
   - exposes fake email server
+  - exposes reading chunks from text file bucket
 - bucket for uploading text files <-- `bucketService`
-  - ingestion script
+  - ingestion script: writes embeddings of file chunks into vector db
 - vector db <-- `vectorDbService`
+  - contains vectors for the most important keywords in text-file-chunks
+  - the embedded vector for "dog" will be similar to that for "retriever" ... thus making search much more robust
 
 ## Ingestor pseudocode
 
@@ -44,7 +44,7 @@ def onFileUpload(file):
     fileUrl = saveFileLocally(file)
 
     for chunkNr, chunk in splitContents(fileContents, words=1_000):
-        embedding = llmService.embed(fileContents)
+        embedding = llmService.embed(chunk)
         vectorDbService.upload(embedding, fileUrl, chunkNr)
 
 ```
@@ -54,28 +54,41 @@ def onFileUpload(file):
 ```python
 def getCapabilities():
     return [{
-        "name": "readFiles",
+        "name": "findChunks",
         "description": "Allows loading text chunks by keywords from a bucket of text files",
-        "inputSchema": {...}
+        "inputSchema": {
+            "name": "search_query",
+            "type": "string",
+            "description": "a question about the things to search for"
+        }
     }, {
         "name": "sendMail",
         "description": "Allows sending emails",
-        "inputSchema": {...}
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "to": {"type": "string"},
+                "subject": {"type": "string"},
+                "body": {"type": "string"}
+            }
+        }
     }]
 
 
 def execute(tool, *args):
 
-    if tool == "readFiles":
-        fileUrls, chunkNrs = vectorDbService.similarity_search(*args)
-        fileContents = bucketService.loadFiles(fileUrls, chunkNrs)
-        return fileContents
+    if tool == "findChunks":
+        output = []
+        for fileUrl, chunkNr in vectorDbService.similarity_search(args):
+            chunkContent = bucketService.loadFileChunk(fileUrl, chunkNr)
+            output.append({"file": fileUrl, "chunkContent": chunkContent})
+        return output
 
     elif tool == "sendMail":
         return f"Mail sent: {args}"
 
     else:
-        pass
+        raise Error(f"No such tool: '{tool}'")
 
 ```
 
@@ -83,29 +96,33 @@ def execute(tool, *args):
 
 ```python
 
+mcpRegex = /[TOOL_CALL](.*)[/TOOL_CALL]/
+
 def host(query):
 
+    mcpCallsAvailable = mcpService.getCapabilities()
+
     messages = [
-        {"role": "system", "content": f"Tools available: {mcpCallsAvailable}. If you want to call an MCP tool, answer with [CALL:<toolname>(<toolArg>*)]"},
+        {"role": "system", "content": f"Tools available: {mcpCallsAvailable}. If you want to call an MCP tool, answer with [TOOL_CALL]{'tool': <toolName>, 'args': <toolArgs>}[/TOOL_CALL]. Output only valid JSON between the TOOL_CALL markers."},
         {"role": "user", "content": query}
     ]
 
-    # should return:
-    # -- MCP to read from vectorDb
-    # -- MCP to write emails
-    mcpCallsAvailable = mcpService.getCapabilities()
-
     loopOngoing = True
+    nrRequests = 0
 
     while loopOngoing:
 
         answer = llmService.query(messages)
 
-        if mcpRegex.match(answer):
+        if match := mcpRegex.match(answer):
 
-            mcpResults = mcpService.execute(answer)
+            mcpResults = mcpService.execute(match["tool"], match["args"])
             messages.append({"role": "assistant", "content": answer})
             messages.append({"role": "tool", "content": mcpResults})
+
+            nrRequests += 1
+            if nrRequests >= 4:
+                messages.append({"role": "system", "content": "The assistant may no longer call MCP. Answer directly to the user in text now."})
 
         else:
             loopOngoing = False
