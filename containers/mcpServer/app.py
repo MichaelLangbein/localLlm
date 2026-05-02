@@ -15,7 +15,7 @@ collection = client.get_or_create_collection(name="chunks")
 
 def embed_text(text):
     payload = {
-        "model": "llama3",
+        "model": "nomic-embed-text",
         "prompt": text
     }
     response = requests.post(f"{LLM_URL}/api/embeddings", json=payload)

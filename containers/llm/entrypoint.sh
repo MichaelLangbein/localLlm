@@ -11,9 +11,12 @@ while ! curl -s localhost:11434/api/tags > /dev/null; do
     sleep 1
 done
 
-# 3. Pull the model now that the server is up
+# 3. Pull the models now that the server is up
 echo "Pulling llama3..."
 ollama pull llama3
+
+echo "Pulling nomic-embed-text for embeddings..."
+ollama pull nomic-embed-text
 
 # 4. Bring the server process to the foreground
 wait
